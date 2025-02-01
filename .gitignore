@@ -1,0 +1,7 @@
+# Security
+**/*.pem
+**/.env
+
+# Webflow
+.DS_Store
+__pycache__/
