@@ -69,22 +69,19 @@ class BookingWidget extends HTMLElement {
         try {
             this.validateDates(checkIn, checkOut);
 
-            // Updated API call with error handling
             const result = await api.checkAvailability(checkIn, checkOut)
                 .catch(error => {
                     console.error('API Error:', error);
-                    throw new Error('Service unavailable. Showing demo properties.');
+                    throw new Error('Service unavailable. Please try again later.');
                 });
 
-            // Store dates for villa page
             sessionStorage.setItem('checkIn', checkIn);
             sessionStorage.setItem('checkOut', checkOut);
 
             this.displayResults(result);
 
-            // Auto-navigate if results are available
             if (result?.data?.length) {
-                window.location.href = '/villas'; // Update with your actual villa page URL
+                window.location.href = '/villas';
             }
 
         } catch (error) {
@@ -96,7 +93,6 @@ class BookingWidget extends HTMLElement {
     }
 
     displayResults(data) {
-        // Basic result display - update with your actual UI components
         this.resultsDiv.innerHTML = data.data?.length
             ? `${data.data.length} properties available`
             : 'No properties available for these dates';
