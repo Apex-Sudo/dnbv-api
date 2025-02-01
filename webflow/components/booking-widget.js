@@ -3,99 +3,64 @@ import { api } from '../utils/api-client.js';
 class BookingWidget extends HTMLElement {
     constructor() {
         super();
-        this.innerHTML = `
-            <div class="dnbv-booking-widget">
-                <form id="bookingForm">
-                    <input
-                        type="date"
-                        id="checkIn"
-                        class="dnbv-date-picker"
-                        required
-                    >
-                    <input
-                        type="date"
-                        id="checkOut"
-                        class="dnbv-date-picker"
-                        required
-                    >
-                    <button
-                        type="submit"
-                        class="dnbv-submit-button"
-                    >
-                        Check Availability
-                        <div class="loading-spinner"></div>
-                    </button>
-                </form>
-                <div id="errorMessage" class="dnbv-error"></div>
-                <div id="availabilityResults"></div>
-            </div>
-        `;
+        this.findVillaButton = document.querySelector('.Submit.Button');
+        this.dateInput = document.querySelector('#date-range');
 
-        this.form = this.querySelector('#bookingForm');
-        this.errorDiv = this.querySelector('#errorMessage');
-        this.resultsDiv = this.querySelector('#availabilityResults');
-        this.submitButton = this.querySelector('.dnbv-submit-button');
+        this.errorDiv = document.createElement('div');
+        this.errorDiv.className = 'dnbv-error';
+        if (this.dateInput) {
+            this.dateInput.parentNode.appendChild(this.errorDiv);
+        }
     }
 
     connectedCallback() {
-        this.form.addEventListener('submit', this.handleSubmit.bind(this));
+        if (this.findVillaButton) {
+            this.findVillaButton.addEventListener('click', this.handleSubmit.bind(this));
+        }
     }
 
-    validateDates(checkIn, checkOut) {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+    validateDates(dateRange) {
+        if (!dateRange) throw new Error('Please select dates');
+        const [checkIn, checkOut] = dateRange.split(' – ');
+        if (!checkIn || !checkOut) throw new Error('Please select both check-in and check-out dates');
+
         const checkInDate = new Date(checkIn);
         const checkOutDate = new Date(checkOut);
 
-        if (checkInDate < today) {
-            throw new Error('Check-in date cannot be in the past');
-        }
-        if (checkOutDate <= checkInDate) {
-            throw new Error('Check-out date must be after check-in date');
-        }
+        // Only validate max stay as minDate is handled by flatpickr
         if ((checkOutDate - checkInDate) / (1000 * 60 * 60 * 24) > 30) {
             throw new Error('Maximum stay is 30 days');
         }
+
+        return [checkIn, checkOut];
     }
 
     async handleSubmit(event) {
         event.preventDefault();
         this.errorDiv.textContent = '';
-        this.submitButton.classList.add('loading');
-
-        const checkIn = this.querySelector('#checkIn').value;
-        const checkOut = this.querySelector('#checkOut').value;
 
         try {
-            this.validateDates(checkIn, checkOut);
+            const dateRange = this.dateInput.value;
+            const [checkIn, checkOut] = this.validateDates(dateRange);
 
-            const result = await api.checkAvailability(checkIn, checkOut)
-                .catch(error => {
-                    console.error('API Error:', error);
-                    throw new Error('Service unavailable. Please try again later.');
-                });
+            this.findVillaButton.classList.add('loading');
+            const result = await api.checkAvailability(checkIn, checkOut);
 
             sessionStorage.setItem('checkIn', checkIn);
             sessionStorage.setItem('checkOut', checkOut);
 
-            this.displayResults(result);
-
-            if (result?.data?.length) {
+            if (result?.listings?.length) {
+                sessionStorage.setItem('availableListings', JSON.stringify(result.listings));
                 window.location.href = '/villas';
+            } else {
+                this.errorDiv.textContent = 'No properties available for these dates';
             }
-
         } catch (error) {
             this.errorDiv.textContent = error.message;
             console.error('Booking Error:', error);
         } finally {
-            this.submitButton.classList.remove('loading');
+            this.findVillaButton.classList.remove('loading');
         }
-    }
-
-    displayResults(data) {
-        this.resultsDiv.innerHTML = data.data?.length
-            ? `${data.data.length} properties available`
-            : 'No properties available for these dates';
     }
 }
 
